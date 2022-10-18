@@ -121,8 +121,7 @@ void Value2Hardware(struct_message value)
 void OnDataRecv(uint8_t *mac_addr, uint8_t *data, uint8_t data_len)
 {
 
-  if ((mac_addr[0] == Controle_Address[0][0] && mac_addr[1] == Controle_Address[0][1] && mac_addr[2] == Controle_Address[0][2]) 
-  || (mac_addr[0] == Controle_Address[1][0] && mac_addr[1] == Controle_Address[1][1] && mac_addr[2] == Controle_Address[1][2]))
+  if ((mac_addr[0] == Controle_Address[0][0] && mac_addr[1] == Controle_Address[0][1] && mac_addr[2] == Controle_Address[0][2]) || (mac_addr[0] == Controle_Address[1][0] && mac_addr[1] == Controle_Address[1][1] && mac_addr[2] == Controle_Address[1][2]))
   {
     ESP.wdtFeed();
     memcpy(&Controle, data, sizeof(Controle));
@@ -147,7 +146,7 @@ void ConnectEspNow()
   esp_now_register_recv_cb(OnDataRecv);
   debugln("nowReady");
 
- wifi_set_channel(10);
+  // wifi_set_channel(10);
 }
 
 void setup()
@@ -170,7 +169,6 @@ void setup()
   pinMode(2, OUTPUT);
   pinMode(V_bat, INPUT);
   FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, NUM_LEDS);
-
 }
 
 void loop()
