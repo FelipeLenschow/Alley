@@ -32,18 +32,21 @@ typedef struct struct_message
   signed int motor_e;
   /// Valor entre -255 e 255
   signed int motor_d;
-  /// Valor entre 0 e 180
+  /// Valor entre 1000ms e 2000ms
   int arma_vel;
   /// Primeiro indice é o led, o segundo são os valores de RGB (0-255 cada)
   byte led[2][3];
+  /// 1 para ativo 0 caso contrario
+  bool FreioE;
+  bool FreioD;
 } struct_message;
 
 struct_message Controle;
 
-/// Endereço do ESP32 do controle
-uint8_t Controle_Address[2][6] = {
-    {0x24, 0x0A, 0xC4, 0x58, 0xF1, 0xF0},
-    {0xC4, 0x5B, 0xBE, 0x61, 0xFA, 0x3A}};
+/// Endereço do ESP controle
+uint8_t Controle_Address[1][6]=//2][6] = {
+    {0x24, 0x0A, 0xC4, 0x58, 0xF1, 0xF0};//,
+    //{0xC4, 0x5B, 0xBE, 0x61, 0xFA, 0x3A}};
 
 /// Leds decorativos
 CRGB leds[2];
@@ -51,45 +54,61 @@ CRGB leds[2];
 Servo Arma;
 
 /// Aciona os motores em qualquer sentido
-void Motor(signed int velocidade1, signed int velocidade2)
+void Motor(signed int velocidade1, signed int velocidade2, bool freio1, bool freio2)
 {
 
-  if (velocidade1 > 0)
+  if (!freio1)
   {
-    analogWrite(AI1, velocidade1);
-    analogWrite(AI2, 0);
-  }
-  else
-  {
-    if (velocidade1 == 0)
+    if (velocidade1 > 0)
     {
-      analogWrite(AI1, 0);
+      analogWrite(AI1, velocidade1);
       analogWrite(AI2, 0);
     }
     else
     {
-      analogWrite(AI1, 0);
-      analogWrite(AI2, -velocidade1);
+      if (velocidade1 == 0)
+      {
+        analogWrite(AI1, 0);
+        analogWrite(AI2, 0);
+      }
+      else
+      {
+        analogWrite(AI1, 0);
+        analogWrite(AI2, -velocidade1);
+      }
     }
-  }
-
-  if (velocidade2 > 0)
-  {
-    analogWrite(BI1, velocidade2);
-    analogWrite(BI2, 0);
   }
   else
   {
-    if (velocidade2 == 0)
+    digitalWrite(AI1, HIGH);
+    digitalWrite(AI2, HIGH);
+  }
+
+  if (!freio1)
+  {
+    if (velocidade2 > 0)
     {
-      analogWrite(BI1, 0);
+      analogWrite(BI1, velocidade2);
       analogWrite(BI2, 0);
     }
     else
     {
-      analogWrite(BI1, 0);
-      analogWrite(BI2, -velocidade2);
+      if (velocidade2 == 0)
+      {
+        analogWrite(BI1, 0);
+        analogWrite(BI2, 0);
+      }
+      else
+      {
+        analogWrite(BI1, 0);
+        analogWrite(BI2, -velocidade2);
+      }
     }
+  }
+  else
+  {
+    digitalWrite(BI1, HIGH);
+    digitalWrite(BI2, HIGH);
   }
 }
 /// Desliga o robo quando perde contato com o controle
@@ -98,17 +117,17 @@ void FailSafe()
   if (millis() - time_last_receive > 500) // FAIL SAFE
   {
     Arma.writeMicroseconds(1500);
-    Motor(0, 0);
+    Motor(0, 0, 0, 0);
     leds[0] = CRGB(0, 0, 0);
     leds[1] = CRGB(0, 0, 0);
     FastLED.show();
-    Serial.println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+    debugln("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
   }
 }
 /// Aciona o Hardware com os valores recebidos
 void Value2Hardware(struct_message value)
 {
-  Motor(value.motor_e, value.motor_d);
+  Motor(value.motor_e, value.motor_d, value.FreioD, value.FreioE);
   Arma.writeMicroseconds(value.arma_vel);
   if (analogRead(V_bat) >= 700)
   {
@@ -128,12 +147,12 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *data, uint8_t data_len)
     time_last_receive = millis();
     Value2Hardware(Controle);
 
-    Serial.println("Recebeu");
-    Serial.print(Controle.motor_d);
-    Serial.print("  ");
-    Serial.print(Controle.motor_e);
-    Serial.print("  ");
-    Serial.println(Controle.arma_vel);
+    debugln("Recebeu");
+    debug(Controle.motor_d);
+    debug("  ");
+    debug(Controle.motor_e);
+    debug("  ");
+    debugln(Controle.arma_vel);
   }
 }
 /// Liga o EspNow
@@ -161,10 +180,15 @@ void setup()
   digitalWrite(BI2, LOW);
 
   pinMode(W_pwm, OUTPUT);
-  Arma.attach(W_pwm, 0, 2000);
-  Arma.writeMicroseconds(10);
+  Arma.attach(W_pwm, 1000, 2000);
+  Arma.writeMicroseconds(1500);
   ConnectEspNow();
+#if DEBUG == 1
   Serial.begin(115200);
+#endif
+
+  WiFi.setSleep(false);
+  WiFi.channel(0);
 
   pinMode(2, OUTPUT);
   pinMode(V_bat, INPUT);
@@ -174,12 +198,5 @@ void setup()
 void loop()
 {
   FailSafe();
-  Serial.println(analogRead(V_bat));
 
-  if (analogRead(V_bat) < 700)
-  {
-    leds[0] = CRGB(150, 0, 0);
-    leds[1] = CRGB(150, 0, 0);
-    FastLED.show();
-  }
 }
