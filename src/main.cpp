@@ -44,9 +44,10 @@ typedef struct struct_message
 struct_message Controle;
 
 /// Endereço do ESP controle
-uint8_t Controle_Address[1][6]=//2][6] = {
-    {0x24, 0x0A, 0xC4, 0x58, 0xF1, 0xF0};//,
-    //{0xC4, 0x5B, 0xBE, 0x61, 0xFA, 0x3A}};
+uint8_t Controle_Address[1][6] = // 2][6] = {
+                                 //    {0x24, 0x0A, 0xC4, 0x58, 0xF1, 0xF0}; //,
+    {0xC4, 0x5B, 0xBE, 0x61, 0xFA, 0x3A}
+;
 
 /// Leds decorativos
 CRGB leds[2];
@@ -84,7 +85,7 @@ void Motor(signed int velocidade1, signed int velocidade2, bool freio1, bool fre
     digitalWrite(AI2, HIGH);
   }
 
-  if (!freio1)
+  if (!freio2)
   {
     if (velocidade2 > 0)
     {
@@ -129,23 +130,20 @@ void Value2Hardware(struct_message value)
 {
   Motor(value.motor_e, value.motor_d, value.FreioD, value.FreioE);
   Arma.writeMicroseconds(value.arma_vel);
-  if (analogRead(V_bat) >= 700)
-  {
-    leds[0] = CRGB(value.led[0][0], value.led[0][1], value.led[0][2]);
-    leds[1] = CRGB(value.led[1][0], value.led[1][1], value.led[1][2]);
-    FastLED.show();
-  }
+  leds[0] = CRGB(value.led[0][0], value.led[0][1], value.led[0][2]);
+  leds[1] = CRGB(value.led[1][0], value.led[1][1], value.led[1][2]);
+  FastLED.show();
 }
 /// Calback de recepção de dados
 void OnDataRecv(uint8_t *mac_addr, uint8_t *data, uint8_t data_len)
 {
 
-  if ((mac_addr[0] == Controle_Address[0][0] && mac_addr[1] == Controle_Address[0][1] && mac_addr[2] == Controle_Address[0][2]) || (mac_addr[0] == Controle_Address[1][0] && mac_addr[1] == Controle_Address[1][1] && mac_addr[2] == Controle_Address[1][2]))
-  {
-    ESP.wdtFeed();
+  //if ((mac_addr[0] == Controle_Address[0][0] && mac_addr[1] == Controle_Address[0][1] && mac_addr[2] == Controle_Address[0][2]) || (mac_addr[0] == Controle_Address[1][0] && mac_addr[1] == Controle_Address[1][1] && mac_addr[2] == Controle_Address[1][2]))
+  //{
     memcpy(&Controle, data, sizeof(Controle));
-    time_last_receive = millis();
     Value2Hardware(Controle);
+    time_last_receive = millis();
+    ESP.wdtFeed();
 
     debugln("Recebeu");
     debug(Controle.motor_d);
@@ -153,19 +151,23 @@ void OnDataRecv(uint8_t *mac_addr, uint8_t *data, uint8_t data_len)
     debug(Controle.motor_e);
     debug("  ");
     debugln(Controle.arma_vel);
-  }
+  //}
 }
 /// Liga o EspNow
 void ConnectEspNow()
 {
+  WiFi.channel(1);
+  wifi_set_channel(1);
   WiFi.mode(WIFI_STA);
+
   if (esp_now_init() != 0)
     debugln("ESPNow Init Failed");
-  esp_now_set_self_role(ESP_NOW_ROLE_SLAVE);
+  esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);
   esp_now_register_recv_cb(OnDataRecv);
   debugln("nowReady");
 
-  // wifi_set_channel(10);
+  esp_now_add_peer(Controle_Address[0], ESP_NOW_ROLE_CONTROLLER, 1, NULL, 0);
+  // WiFi.mode(WIFI_STA);
 }
 
 void setup()
@@ -188,15 +190,13 @@ void setup()
 #endif
 
   WiFi.setSleep(false);
-  WiFi.channel(0);
 
   pinMode(2, OUTPUT);
-  pinMode(V_bat, INPUT);
+  //pinMode(V_bat, INPUT);
   FastLED.addLeds<WS2812, LED_PIN, GRB>(leds, NUM_LEDS);
 }
 
 void loop()
 {
   FailSafe();
-
 }
